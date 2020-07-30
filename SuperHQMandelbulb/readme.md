@@ -1,2 +1,2 @@
 # Super HQ Mandelbulb
-Check this shader out live
+Check [it out Live](https://www.shadertoy.com/view/3tXfz4)
