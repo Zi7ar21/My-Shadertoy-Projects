@@ -28,30 +28,45 @@
 #define MAX_MARCHES 1024
 #define MAX_DISTANCE 32.0
 // Fake Volumetric Function
-#define COLLISION_DISTANCE ((abs(tan(iTime*16.0)))/2048.0)
+#define COLLISION_DISTANCE abs(tan(hash11(float(iFrame+1))*3.14159265)/512.0)
 #define Bailout 4.0
-#define Iterations 32
+#define Iterations 64
+
+float hash11(float p)
+{
+    p = fract(p * .1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+vec3 hash33(vec3 p3)
+{
+    p3 = fract(p3 * vec3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yxz+33.33);
+    return fract((p3.xxy + p3.yxx)*p3.zyx);
+
+}
 
 // Mandelbulb Distance Estimator
 float sphere(vec3 pos) {
     float Power = float(2.0);
     vec3 z = pos;
-    float dr = 4.0;
-    float r = 8.0;
+    float dr = 1.0;
+    float r = 1.0;
     for (int i = 0; i < Iterations ; i++) {
         r = length(z);
         if (r>Bailout) break;
-
+        
         // Convert to Polar Coordinates
         float theta = acos(z.z/r);
         float phi = atan(z.y,z.x);
         dr =  pow( r, Power-1.0)*Power*dr + 1.0;
-
+        
         // Scale and Rotate the Point
         float zr = pow( r,Power);
         theta = theta*Power;
         phi = phi*Power;
-
+        
         // Convert Back to Cartesian Coordinates
         z = zr*vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta));
         z+=pos;
@@ -140,25 +155,15 @@ float noise(vec3 p){
     return o4.y * d.y + o4.x * (1.0 - d.y);
 }
 
-// ACES Tone Curve
-vec3 acesFilm(const vec3 x) {
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);
-}
-
 // Render the Image
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
+{    
     // Camera Orientation
     vec3 xdir = vec3(1.0,0.0,0.0);
     vec3 ydir = vec3(0.0,1.0,0.0);
     vec3 zdir = vec3(0.0,0.0,1.0);
     float FOV = 1.0;
-    vec3 camerapos = vec3(sin(iTime*60.0)/(iResolution.x/(FOV)), cos(iTime*60.0)/(iResolution.y/(FOV)), -4.5);
+    vec3 camerapos = vec3(sin(float(iFrame))/(iResolution.x/(FOV)), cos(float(iFrame))/(iResolution.y/(FOV)), -4.5);
 
     // Undistorted Normalized Pixel Coordinates (From 0 to 1)
     vec2 uv = (fragCoord - 0.5*iResolution.xy)/iResolution.x;
@@ -175,10 +180,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 diffuse = shade(march);
 
     // Dither
-    col = diffuse*(noise(vec3((iTime*fragCoord)+(fragCoord*2.0), iFrame*2)));
-
-    // Finish the Image and Apply Tone Map
-    col = vec3(acesFilm(col*2.0));
+    col = diffuse*(hash33(vec3((float(iFrame)*fragCoord)+(fragCoord*2.0), iFrame*2)));
 
     // Output to Screen
     fragColor = vec4((col+texture(iChannel0, uvb).rgb),1.0);
